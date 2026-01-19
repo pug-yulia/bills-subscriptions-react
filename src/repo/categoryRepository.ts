@@ -6,7 +6,7 @@ import { Category } from "../domain/Category";
  */
 export async function getCategoriesCount(): Promise<number> {
   const row = await db.getFirstAsync<{ count: number }>(
-    `SELECT COUNT(*) as count FROM categories`
+    `SELECT COUNT(*) as count FROM categories`,
   );
   return row?.count ?? 0;
 }
@@ -26,12 +26,15 @@ export async function getAllCategories(): Promise<Category[]> {
       updatedAt
     FROM categories
     ORDER BY name ASC
-    `
+    `,
   );
 
   return rows;
 }
 
+/**
+ * Получить категорию по id
+ */
 export async function getCategoryById(id: string): Promise<Category | null> {
   const row = await db.getFirstAsync<Category>(
     `
@@ -45,7 +48,7 @@ export async function getCategoryById(id: string): Promise<Category | null> {
     FROM categories
     WHERE id = ?
     `,
-    [id]
+    [id],
   );
   return row ?? null;
 }
@@ -73,7 +76,7 @@ export async function insertCategory(category: Category): Promise<void> {
       category.icon ?? null,
       category.createdAt,
       category.updatedAt,
-    ]
+    ],
   );
 }
 
@@ -97,7 +100,7 @@ export async function updateCategory(category: Category): Promise<void> {
       category.icon ?? null,
       category.updatedAt,
       category.id,
-    ]
+    ],
   );
 }
 
