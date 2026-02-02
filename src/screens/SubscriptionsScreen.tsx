@@ -17,6 +17,14 @@ import { getAllCurrencies, Currency } from "../repo/currencyRepository";
 import { PaymentEntry } from "../domain/PaymentEntry";
 import { Category } from "../domain/Category";
 
+import { Alert } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+
+import {
+  deletePaymentEntry,
+  setPaymentEntryPaidStatus,
+} from "../repo/paymentEntryRepository";
+
 /* ================= helpers ================= */
 
 function formatAmount(amountMinor: number, currency: Currency): string {
@@ -44,12 +52,18 @@ function isInNext30Days(iso: string): boolean {
   return d >= now && d <= in30;
 }
 
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
 /* ================= screen ================= */
 
 type DateFilter = "all" | "thisMonth" | "next30";
 type SortOrder = "asc" | "desc";
 
 export function SubscriptionsScreen() {
+  const navigation = useNavigation<any>();
+
   const [entries, setEntries] = useState<PaymentEntry[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
@@ -114,6 +128,47 @@ export function SubscriptionsScreen() {
     return data;
   }, [entries, dateFilter, sortOrder]);
 
+  /* ---------- CRUD handlers ---------- */
+
+  const onTogglePaid = useCallback(
+    async (entry: PaymentEntry) => {
+      try {
+        await setPaymentEntryPaidStatus(entry.id, !entry.isPaid, nowIso());
+        await loadData();
+      } catch (e: any) {
+        console.error("toggle paid error:", e);
+        Alert.alert("Ошибка", String(e?.message ?? e));
+      }
+    },
+    [loadData],
+  );
+
+  const onDelete = useCallback(
+    (entry: PaymentEntry) => {
+      Alert.alert(
+        "Удалить запись?",
+        `"${entry.title}" будет удалена без возможности восстановления.`,
+        [
+          { text: "Отмена", style: "cancel" },
+          {
+            text: "Удалить",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await deletePaymentEntry(entry.id);
+                await loadData();
+              } catch (e: any) {
+                console.error("deletePaymentEntry error:", e);
+                Alert.alert("Ошибка", String(e?.message ?? e));
+              }
+            },
+          },
+        ],
+      );
+    },
+    [loadData],
+  );
+
   /* ---------- UI ---------- */
 
   function renderItem({ item }: { item: PaymentEntry }) {
@@ -123,18 +178,55 @@ export function SubscriptionsScreen() {
     return (
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.title}>{item.title}</Text>
+          <Text style={[styles.title, item.isPaid && styles.paidTitle]}>
+            {item.title}
+          </Text>
           <Text style={styles.meta}>
             {cat?.name ?? "—"} · {item.repeatRule ?? "—"} ·{" "}
             {formatDate(item.dueDate)}
           </Text>
         </View>
 
-        {cur ? (
-          <Text style={styles.amount}>{formatAmount(item.amount, cur)}</Text>
-        ) : (
-          <Text style={styles.amount}>—</Text>
-        )}
+        <View style={styles.right}>
+          <Text style={[styles.amount, item.isPaid && styles.paidAmount]}>
+            {cur ? formatAmount(item.amount, cur) : "—"}
+          </Text>
+
+          <View style={styles.actions}>
+            {/* Paid toggle */}
+            <TouchableOpacity
+              onPress={() => onTogglePaid(item)}
+              style={styles.iconBtn}
+              activeOpacity={0.85}
+            >
+              <Ionicons
+                name={
+                  item.isPaid ? "checkmark-circle" : "checkmark-circle-outline"
+                }
+                size={20}
+                color={item.isPaid ? "#19a35b" : "#666"}
+              />
+            </TouchableOpacity>
+
+            {/* Edit */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate("AddPayment", { id: item.id })}
+              style={styles.iconBtn}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="pencil-outline" size={20} color="#1f4bff" />
+            </TouchableOpacity>
+
+            {/* Delete */}
+            <TouchableOpacity
+              onPress={() => onDelete(item)}
+              style={styles.iconBtn}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="trash-outline" size={20} color="#d11a2a" />
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     );
   }
@@ -243,4 +335,28 @@ const styles = StyleSheet.create({
   sep: { height: 1, backgroundColor: "#eee", marginHorizontal: 16 },
 
   center: { padding: 24, alignItems: "center" },
+
+  paidTitle: {
+    color: "#777",
+    textDecorationLine: "line-through",
+  },
+
+  right: {
+    alignItems: "flex-end",
+    gap: 6,
+  },
+
+  paidAmount: {
+    color: "#777",
+  },
+
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  iconBtn: {
+    padding: 4,
+  },
 });

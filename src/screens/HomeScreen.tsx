@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 
 import { initDb, resetAndInitDb, resetDb } from "../db/database";
 import {
@@ -43,6 +44,7 @@ function monthKey(d: Date) {
 }
 
 export function HomeScreen() {
+  const navigation = useNavigation<any>();
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [entries, setEntries] = useState<PaymentEntry[]>([]);
@@ -220,7 +222,10 @@ export function HomeScreen() {
       </View>
 
       <View style={styles.body}>
-        <SectionHeader title="Upcoming Bills" />
+        <SectionHeader
+          title="Upcoming Bills"
+          onPress={() => navigation.navigate("Bills")}
+        />
         <FlatList
           data={upcomingBills}
           keyExtractor={(item) => item.id}
@@ -253,7 +258,11 @@ export function HomeScreen() {
 
         <View style={{ height: 18 }} />
 
-        <SectionHeader title="Active Subscriptions" />
+        <SectionHeader
+          title="Active Subscriptions"
+          onPress={() => navigation.navigate("Subscriptions")}
+        />
+
         <FlatList
           data={activeSubscriptions}
           keyExtractor={(item) => item.id}
@@ -284,11 +293,17 @@ export function HomeScreen() {
   );
 }
 
-function SectionHeader({ title }: { title: string }) {
+function SectionHeader({
+  title,
+  onPress,
+}: {
+  title: string;
+  onPress: () => void;
+}) {
   return (
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      <TouchableOpacity activeOpacity={0.8}>
+      <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
         <Text style={styles.seeAll}>See all</Text>
       </TouchableOpacity>
     </View>

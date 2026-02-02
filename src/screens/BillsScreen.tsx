@@ -6,11 +6,16 @@ import {
   SafeAreaView,
   FlatList,
   TouchableOpacity,
+  Alert,
 } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 
-import { getAllPaymentEntries } from "../repo/paymentEntryRepository";
+import {
+  getAllPaymentEntries,
+  deletePaymentEntry,
+  setPaymentEntryPaidStatus,
+} from "../repo/paymentEntryRepository";
 import { getAllCategories } from "../repo/categoryRepository";
 import { getAllCurrencies, Currency } from "../repo/currencyRepository";
 
@@ -44,12 +49,18 @@ function isInNext30Days(iso: string): boolean {
   return d >= now && d <= in30;
 }
 
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
 /* ================= screen ================= */
 
 type DateFilter = "all" | "thisMonth" | "next30";
 type SortOrder = "asc" | "desc";
 
 export function BillsScreen() {
+  const navigation = useNavigation<any>();
+
   const [entries, setEntries] = useState<PaymentEntry[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
@@ -78,6 +89,8 @@ export function BillsScreen() {
       setEntries(ents);
       setCategories(cats);
       setCurrencies(currs);
+    } catch (e) {
+      console.error("BillsScreen loadData error:", e);
     } finally {
       setLoading(false);
     }
@@ -98,14 +111,12 @@ export function BillsScreen() {
   const filteredSorted = useMemo(() => {
     let data = [...entries];
 
-    // filter by date
     if (dateFilter === "thisMonth") {
       data = data.filter((e) => isInThisMonth(e.dueDate));
     } else if (dateFilter === "next30") {
       data = data.filter((e) => isInNext30Days(e.dueDate));
     }
 
-    // sort by dueDate
     data.sort((a, b) => {
       const da = new Date(a.dueDate).getTime();
       const db = new Date(b.dueDate).getTime();
@@ -118,6 +129,47 @@ export function BillsScreen() {
   const bills = filteredSorted.filter((e) => e.type === "bill");
   const subs = filteredSorted.filter((e) => e.type === "subscription");
 
+  /* ---------- CRUD handlers ---------- */
+
+  const onTogglePaid = useCallback(
+    async (entry: PaymentEntry) => {
+      try {
+        await setPaymentEntryPaidStatus(entry.id, !entry.isPaid, nowIso());
+        await loadData();
+      } catch (e: any) {
+        console.error("toggle paid error:", e);
+        Alert.alert("Ошибка", String(e?.message ?? e));
+      }
+    },
+    [loadData],
+  );
+
+  const onDelete = useCallback(
+    (entry: PaymentEntry) => {
+      Alert.alert(
+        "Удалить запись?",
+        `"${entry.title}" будет удалена без возможности восстановления.`,
+        [
+          { text: "Отмена", style: "cancel" },
+          {
+            text: "Удалить",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await deletePaymentEntry(entry.id);
+                await loadData();
+              } catch (e: any) {
+                console.error("deletePaymentEntry error:", e);
+                Alert.alert("Ошибка", String(e?.message ?? e));
+              }
+            },
+          },
+        ],
+      );
+    },
+    [loadData],
+  );
+
   /* ---------- UI ---------- */
 
   function renderItem({ item }: { item: PaymentEntry }) {
@@ -127,17 +179,54 @@ export function BillsScreen() {
     return (
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.title}>{item.title}</Text>
+          <Text style={[styles.title, item.isPaid && styles.paidTitle]}>
+            {item.title}
+          </Text>
           <Text style={styles.meta}>
             {cat?.name ?? "—"} · {formatDate(item.dueDate)}
           </Text>
         </View>
 
-        {cur ? (
-          <Text style={styles.amount}>{formatAmount(item.amount, cur)}</Text>
-        ) : (
-          <Text style={styles.amount}>—</Text>
-        )}
+        <View style={styles.right}>
+          <Text style={[styles.amount, item.isPaid && styles.paidAmount]}>
+            {cur ? formatAmount(item.amount, cur) : "—"}
+          </Text>
+
+          <View style={styles.actions}>
+            {/* Paid toggle */}
+            <TouchableOpacity
+              onPress={() => onTogglePaid(item)}
+              style={styles.iconBtn}
+              activeOpacity={0.85}
+            >
+              <Ionicons
+                name={
+                  item.isPaid ? "checkmark-circle" : "checkmark-circle-outline"
+                }
+                size={20}
+                color={item.isPaid ? "#19a35b" : "#666"}
+              />
+            </TouchableOpacity>
+
+            {/* Edit */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate("AddPayment", { id: item.id })}
+              style={styles.iconBtn}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="pencil-outline" size={20} color="#1f4bff" />
+            </TouchableOpacity>
+
+            {/* Delete */}
+            <TouchableOpacity
+              onPress={() => onDelete(item)}
+              style={styles.iconBtn}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="trash-outline" size={20} color="#d11a2a" />
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     );
   }
@@ -148,6 +237,7 @@ export function BillsScreen() {
       <TouchableOpacity
         onPress={() => setDateFilter(value)}
         style={[styles.chip, active && styles.chipActive]}
+        activeOpacity={0.85}
       >
         <Text style={[styles.chipText, active && styles.chipTextActive]}>
           {label}
@@ -163,6 +253,7 @@ export function BillsScreen() {
 
         <TouchableOpacity
           onPress={() => setSortOrder((o) => (o === "asc" ? "desc" : "asc"))}
+          activeOpacity={0.85}
         >
           <Ionicons
             name={sortOrder === "asc" ? "arrow-down" : "arrow-up"}
@@ -171,7 +262,6 @@ export function BillsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Filters */}
       <View style={styles.filters}>
         {filterChip("All", "all")}
         {filterChip("This month", "thisMonth")}
@@ -274,9 +364,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  title: { fontWeight: "700" },
-  meta: { fontSize: 12, color: "#777" },
-  amount: { fontWeight: "800" },
+
+  title: { fontWeight: "800", color: "#111" },
+  paidTitle: { color: "#777", textDecorationLine: "line-through" },
+
+  meta: { fontSize: 12, color: "#777", marginTop: 2 },
+
+  right: { alignItems: "flex-end", gap: 6 },
+  amount: { fontWeight: "900", color: "#111" },
+  paidAmount: { color: "#777" },
+
+  actions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  iconBtn: { padding: 4 },
 
   sep: { height: 1, backgroundColor: "#eee", marginHorizontal: 16 },
 

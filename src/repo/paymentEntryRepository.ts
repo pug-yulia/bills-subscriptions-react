@@ -138,3 +138,20 @@ export async function updatePaymentEntry(entry: PaymentEntry): Promise<void> {
 export async function deletePaymentEntry(id: string): Promise<void> {
   await db.runAsync("DELETE FROM payment_entries WHERE id = ?", [id]);
 }
+
+export async function setPaymentEntryPaidStatus(
+  id: string,
+  isPaid: boolean,
+  updatedAt: string,
+): Promise<void> {
+  await db.runAsync(
+    `
+    UPDATE payment_entries
+    SET
+      isPaid = ?,
+      updatedAt = ?
+    WHERE id = ?
+    `,
+    [isPaid ? 1 : 0, updatedAt, id],
+  );
+}
