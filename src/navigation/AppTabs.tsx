@@ -1,5 +1,5 @@
 import React from "react";
-import { View, TouchableOpacity, StyleSheet, Platform } from "react-native";
+import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -11,26 +11,27 @@ import { AddPaymentScreen } from "../screens/AddPaymentScreen";
 
 const Tab = createBottomTabNavigator();
 
-function PlusButton() {
+function PlusButton({ onPress }: { onPress: () => void }) {
   return (
-    <View style={styles.plusWrap}>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
+      style={styles.plusWrap}
+    >
       <View style={styles.plusBtn}>
         <Ionicons name="add" size={28} color="#fff" />
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
+
 export function AppTabs() {
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
-        tabBarStyle: {
-          height: Platform.OS === "ios" ? 86 : 70,
-          paddingBottom: Platform.OS === "ios" ? 24 : 10,
-          paddingTop: 10,
-        },
+        tabBarStyle: { height: 70, paddingBottom: 10 },
       }}
     >
       <Tab.Screen
@@ -38,7 +39,7 @@ export function AppTabs() {
         component={HomeScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
+            <Ionicons name="home-outline" color={color} size={size} />
           ),
         }}
       />
@@ -48,19 +49,31 @@ export function AppTabs() {
         component={BillsScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="wallet-outline" size={size} color={color} />
+            <Ionicons name="document-text-outline" color={color} size={size} />
           ),
         }}
       />
 
-      {/* Центральная кнопка "+" (пока просто заглушка) */}
+      {/* ВАЖНО: AddPayment — отдельный экран в табах, но кнопка таба — "плюс" */}
       <Tab.Screen
-        name="Add"
+        name="AddPayment"
         component={AddPaymentScreen}
-        options={{
+        options={({ navigation }) => ({
           tabBarLabel: "",
-          tabBarIcon: () => <PlusButton />,
-        }}
+          tabBarIcon: () => null,
+          tabBarButton: () => (
+            <PlusButton
+              onPress={() => {
+                // КЛЮЧ: не подмешивать старые params (иначе залипает id)
+                navigation.navigate({
+                  name: "AddPayment",
+                  params: {}, // create
+                  merge: false, // ВАЖНО
+                });
+              }}
+            />
+          ),
+        })}
       />
 
       <Tab.Screen
@@ -68,7 +81,7 @@ export function AppTabs() {
         component={SubscriptionsScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="card-outline" size={size} color={color} />
+            <Ionicons name="card-outline" color={color} size={size} />
           ),
         }}
       />
@@ -78,7 +91,7 @@ export function AppTabs() {
         component={SettingsScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" size={size} color={color} />
+            <Ionicons name="settings-outline" color={color} size={size} />
           ),
         }}
       />
@@ -88,21 +101,22 @@ export function AppTabs() {
 
 const styles = StyleSheet.create({
   plusWrap: {
-    width: 70,
+    position: "relative",
+    top: -18,
     alignItems: "center",
+    justifyContent: "center",
+    width: 70,
   },
   plusBtn: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: "#1f4bff",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: -18,
     shadowColor: "#000",
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
     shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
   },
 });

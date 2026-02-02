@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -11,7 +11,11 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import {
+  useNavigation,
+  useRoute,
+  useFocusEffect,
+} from "@react-navigation/native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 import { getAllCategories } from "../repo/categoryRepository";
@@ -20,7 +24,11 @@ import {
   getBaseCurrencyCode,
   Currency,
 } from "../repo/currencyRepository";
-import { insertPaymentEntry } from "../repo/paymentEntryRepository";
+import {
+  insertPaymentEntry,
+  updatePaymentEntry,
+  getPaymentEntryById,
+} from "../repo/paymentEntryRepository";
 
 import { Category } from "../domain/Category";
 import { PaymentEntry, PaymentType, RepeatRule } from "../domain/PaymentEntry";
@@ -50,6 +58,10 @@ function isoFromDateOnly(dateOnly: string): string {
   return new Date(y, m - 1, d).toISOString();
 }
 
+function dateOnlyFromIso(iso: string): string {
+  return dateOnlyFromDate(new Date(iso));
+}
+
 function toMinorUnits(amountStr: string, minorUnit: number): number | null {
   const s = amountStr.replace(",", ".").trim();
   const n = Number(s);
@@ -57,10 +69,20 @@ function toMinorUnits(amountStr: string, minorUnit: number): number | null {
   return Math.round(n * Math.pow(10, minorUnit));
 }
 
+function fromMinorUnits(amountMinor: number, minorUnit: number): string {
+  const factor = Math.pow(10, minorUnit);
+  return (amountMinor / factor).toFixed(minorUnit);
+}
+
 /* ================= screen ================= */
 
 export function AddPaymentScreen() {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+
+  // КЛЮЧ: читаем только id (а не весь params-объект)
+  const editId: string | undefined = route.params?.id;
+  const isEdit = Boolean(editId);
 
   const [loading, setLoading] = useState(true);
 
@@ -71,6 +93,8 @@ export function AddPaymentScreen() {
     [currencies],
   );
 
+  const [originalEntry, setOriginalEntry] = useState<PaymentEntry | null>(null);
+
   /* ---------- form state ---------- */
 
   const [type, setType] = useState<PaymentType>("bill");
@@ -79,38 +103,80 @@ export function AddPaymentScreen() {
   const [currencyCode, setCurrencyCode] = useState("USD");
   const [categoryId, setCategoryId] = useState("");
 
-  // дата хранится как YYYY-MM-DD (удобно и для отображения, и для конвертации)
   const [dueDate, setDueDate] = useState<string>(todayDateOnly());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const [repeatRule, setRepeatRule] = useState<RepeatRule>("monthly");
   const [note, setNote] = useState("");
 
-  /* ---------- load data ---------- */
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const [cats, currs, base] = await Promise.all([
-          getAllCategories(),
-          getAllCurrencies(),
-          getBaseCurrencyCode(),
-        ]);
-
-        setCategories(cats);
-        setCurrencies(currs);
-        setCurrencyCode(base || "USD");
-        setCategoryId(cats[0]?.id ?? "");
-      } catch (e: any) {
-        console.error("AddPaymentScreen load error:", e);
-        Alert.alert("Ошибка", String(e?.message ?? e));
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const resetForm = useCallback((base: string | null, cats: Category[]) => {
+    setOriginalEntry(null);
+    setType("bill");
+    setTitle("");
+    setAmount("");
+    setCurrencyCode(base || "USD");
+    setCategoryId(cats[0]?.id ?? "");
+    setDueDate(todayDateOnly());
+    setRepeatRule("monthly");
+    setNote("");
   }, []);
 
-  /* ---------- save ---------- */
+  const loadScreenData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [cats, currs, base] = await Promise.all([
+        getAllCategories(),
+        getAllCurrencies(),
+        getBaseCurrencyCode(),
+      ]);
+
+      setCategories(cats);
+      setCurrencies(currs);
+
+      // CREATE: если нет id — просто сброс формы
+      // ВАЖНО: НЕ делаем здесь navigation.setParams(), чтобы не ловить цикл.
+      if (!editId) {
+        resetForm(base, cats);
+        return;
+      }
+
+      // EDIT: грузим запись
+      const entry = await getPaymentEntryById(editId);
+      if (!entry) {
+        Alert.alert("Ошибка", "Запись для редактирования не найдена");
+        navigation.navigate("Home");
+        return;
+      }
+
+      setOriginalEntry(entry);
+
+      setType(entry.type);
+      setTitle(entry.title);
+      setCurrencyCode(entry.currencyCode);
+      setCategoryId(entry.categoryId);
+      setDueDate(dateOnlyFromIso(entry.dueDate));
+      setRepeatRule((entry.repeatRule as RepeatRule) ?? "monthly");
+      setNote(entry.note ?? "");
+
+      const cur = new Map(currs.map((c) => [c.code, c])).get(
+        entry.currencyCode,
+      );
+      const mu = cur?.minorUnit ?? 2;
+      setAmount(fromMinorUnits(entry.amount, mu));
+    } catch (e: any) {
+      console.error("AddPaymentScreen load error:", e);
+      Alert.alert("Ошибка", String(e?.message ?? e));
+    } finally {
+      setLoading(false);
+    }
+  }, [editId, navigation, resetForm]);
+
+  // КЛЮЧ: грузим на каждый фокус, чтобы после Edit → "+" форма была чистой
+  useFocusEffect(
+    useCallback(() => {
+      loadScreenData();
+    }, [loadScreenData]),
+  );
 
   async function onSave() {
     if (!title.trim()) {
@@ -133,41 +199,63 @@ export function AddPaymentScreen() {
 
     const now = nowIso();
 
-    const entry: PaymentEntry = {
-      id: makeId(),
-      title: title.trim(),
-      amount: amountMinor,
-      currencyCode,
-      type,
-      categoryId,
-      dueDate: isoFromDateOnly(dueDate),
-      repeatRule: type === "subscription" ? repeatRule : null,
-      note: note.trim() || null,
-      isPaid: false,
-      createdAt: now,
-      updatedAt: now,
-    };
-
     try {
-      await insertPaymentEntry(entry);
+      if (isEdit) {
+        if (!originalEntry) {
+          Alert.alert("Ошибка", "Нет данных редактируемой записи");
+          return;
+        }
+
+        const updated: PaymentEntry = {
+          ...originalEntry,
+          title: title.trim(),
+          amount: amountMinor,
+          currencyCode,
+          type,
+          categoryId,
+          dueDate: isoFromDateOnly(dueDate),
+          repeatRule: type === "subscription" ? repeatRule : null,
+          note: note.trim() || null,
+          updatedAt: now,
+        };
+
+        await updatePaymentEntry(updated);
+
+        // После сохранения: обязательно перейти на Home
+        // (Плюсик уже открывает create через merge:false)
+        navigation.navigate("Home");
+        return;
+      }
+
+      const created: PaymentEntry = {
+        id: makeId(),
+        title: title.trim(),
+        amount: amountMinor,
+        currencyCode,
+        type,
+        categoryId,
+        dueDate: isoFromDateOnly(dueDate),
+        repeatRule: type === "subscription" ? repeatRule : null,
+        note: note.trim() || null,
+        isPaid: false,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await insertPaymentEntry(created);
       navigation.navigate("Home");
     } catch (e: any) {
-      console.error("insertPaymentEntry error:", e);
+      console.error("save error:", e);
       Alert.alert("Ошибка", String(e?.message ?? e));
     }
   }
 
-  /* ---------- date picker handler ---------- */
-
   function onPickDate(_event: any, selected?: Date) {
-    // Android вызывает onChange и при отмене, и при выборе
     setShowDatePicker(false);
     if (selected) {
       setDueDate(dateOnlyFromDate(selected));
     }
   }
-
-  /* ================= UI ================= */
 
   if (loading) {
     return (
@@ -182,7 +270,9 @@ export function AddPaymentScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.title}>Добавить</Text>
+        <Text style={styles.headerTitle}>
+          {isEdit ? "Редактирование" : "Добавить"}
+        </Text>
         <TouchableOpacity
           onPress={() => navigation.navigate("Home")}
           style={styles.iconBtn}
@@ -195,7 +285,6 @@ export function AddPaymentScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Type */}
         <Text style={styles.label}>Тип</Text>
         <View style={styles.row}>
           {(["bill", "subscription"] as PaymentType[]).map((t) => (
@@ -214,30 +303,17 @@ export function AddPaymentScreen() {
           ))}
         </View>
 
-        {/* Title */}
         <Text style={styles.label}>Название</Text>
-        <TextInput
-          value={title}
-          onChangeText={setTitle}
-          placeholder="Например: Электроэнергия"
-          style={styles.input}
-        />
+        <TextInput value={title} onChangeText={setTitle} style={styles.input} />
 
-        {/* Amount */}
         <Text style={styles.label}>Сумма</Text>
         <TextInput
           value={amount}
           onChangeText={setAmount}
-          placeholder="Например: 1.80"
           keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
           style={styles.input}
         />
-        <Text style={styles.hint}>
-          Ввод в основной единице (RUB/USD), сохраняем в minor units по
-          minorUnit валюты.
-        </Text>
 
-        {/* Currency */}
         <Text style={styles.label}>Валюта</Text>
         <View style={styles.rowWrap}>
           {currencies.map((c) => (
@@ -262,7 +338,6 @@ export function AddPaymentScreen() {
           ))}
         </View>
 
-        {/* Category */}
         <Text style={styles.label}>Категория</Text>
         <View style={styles.rowWrap}>
           {categories.map((c) => (
@@ -284,7 +359,6 @@ export function AddPaymentScreen() {
           ))}
         </View>
 
-        {/* Date */}
         <Text style={styles.label}>Дата</Text>
         <TouchableOpacity
           style={[styles.input, styles.dateInput]}
@@ -304,7 +378,6 @@ export function AddPaymentScreen() {
           />
         )}
 
-        {/* Repeat */}
         {type === "subscription" && (
           <>
             <Text style={styles.label}>Повтор</Text>
@@ -332,12 +405,10 @@ export function AddPaymentScreen() {
           </>
         )}
 
-        {/* Note */}
         <Text style={styles.label}>Заметка</Text>
         <TextInput
           value={note}
           onChangeText={setNote}
-          placeholder="Необязательно"
           multiline
           style={[styles.input, { height: 90, textAlignVertical: "top" }]}
         />
@@ -369,13 +440,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  title: { fontSize: 22, fontWeight: "800", color: "#111" },
+  headerTitle: { fontSize: 22, fontWeight: "800", color: "#111" },
   iconBtn: { padding: 6 },
 
   content: { padding: 16, paddingBottom: 32 },
 
   label: { marginTop: 14, marginBottom: 6, fontWeight: "800", color: "#111" },
-  hint: { marginTop: 6, fontSize: 11, color: "#777", lineHeight: 15 },
 
   input: {
     borderWidth: 1,
