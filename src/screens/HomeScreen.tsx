@@ -48,7 +48,7 @@ export function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [entries, setEntries] = useState<PaymentEntry[]>([]);
-  const [search, setSearch] = useState("");
+  // const [search, setSearch] = useState("");
 
   const [baseCurrencyCode, setBaseCurrencyCode] = useState<string>("USD");
   const [currencies, setCurrencies] = useState<Currency[]>([]);
@@ -69,7 +69,6 @@ export function HomeScreen() {
     setFxRates(rates);
     setBaseCurrencyCode(base);
   }, []);
-
   useEffect(() => {
     let cancelled = false;
 
@@ -151,11 +150,18 @@ export function HomeScreen() {
     return `${symbol}${value}`;
   }
 
-  const filteredEntries = useMemo(() => {
+  function getTimeOfDay() {
+    const hour = new Date().getHours();
+    if (hour < 12) return "morning ☀️";
+    if (hour < 18) return "afternoon 🌤️";
+    return "evening 🌙";
+  }
+
+  /**const filteredEntries = useMemo(() => {
     if (!search.trim()) return entries;
     const q = search.trim().toLowerCase();
     return entries.filter((e) => e.title.toLowerCase().includes(q));
-  }, [entries, search]);
+  }, [entries, search]);**/
 
   const totalThisMonthBase = useMemo(() => {
     const now = new Date();
@@ -173,8 +179,35 @@ export function HomeScreen() {
 
   const upcomingBills = useMemo(() => {
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return entries
+      .filter(
+        (e) =>
+          e.type === "bill" && new Date(e.dueDate).getTime() >= today.getTime(),
+      )
+      .sort(
+        (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime(),
+      )
+      .slice(0, 4);
+  }, [entries]);
+
+  const activeSubscriptions = useMemo(() => {
+    return entries
+      .filter((e) => e.type === "subscription")
+      .sort((a, b) => a.title.localeCompare(b.title))
+      .slice(0, 3);
+  }, [entries]);
+
+  /**const upcomingBills = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     return filteredEntries
-      .filter((e) => e.type === "bill" && new Date(e.dueDate) >= today)
+      .filter(
+        (e) =>
+          e.type === "bill" && new Date(e.dueDate).getTime() >= today.getTime(),
+      )
       .sort((a, b) => +new Date(a.dueDate) - +new Date(b.dueDate))
       .slice(0, 3);
   }, [filteredEntries]);
@@ -184,14 +217,14 @@ export function HomeScreen() {
       .filter((e) => e.type === "subscription")
       .sort((a, b) => a.title.localeCompare(b.title))
       .slice(0, 3);
-  }, [filteredEntries]);
+  }, [filteredEntries]);**/
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         {/* Шапку Welcome back + колокольчик убрали */}
 
-        <View style={styles.searchWrap}>
+        {/*<View style={styles.searchWrap}>
           <Ionicons name="search-outline" size={18} color="#8aa0ff" />
           <TextInput
             value={search}
@@ -200,7 +233,9 @@ export function HomeScreen() {
             placeholderTextColor="#8aa0ff"
             style={styles.searchInput}
           />
-        </View>
+        </View>*/}
+
+        <Text style={styles.headerSubtitle}>Good {getTimeOfDay()},</Text>
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Total This Month</Text>
@@ -343,10 +378,10 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: "#1f4bff",
     paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 16,
-    borderBottomLeftRadius: 26,
-    borderBottomRightRadius: 26,
+    paddingTop: 28,
+    paddingBottom: 28,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
 
   searchWrap: {
@@ -365,11 +400,12 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    marginTop: 14,
+    marginTop: 0,
     backgroundColor: "#1941df",
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 22,
+    padding: 20,
   },
+
   cardTitle: { color: "#cfd8ff", fontSize: 12 },
   cardValue: { color: "#fff", fontSize: 28, fontWeight: "800", marginTop: 6 },
   cardBottom: {
@@ -412,4 +448,11 @@ const styles = StyleSheet.create({
 
   sep: { height: 1, backgroundColor: "#f0f0f0" },
   empty: { color: "#777", paddingVertical: 10 },
+
+  headerSubtitle: {
+    color: "#cfd8ff",
+    fontSize: 20,
+    fontWeight: "600",
+    marginBottom: 12,
+  },
 });

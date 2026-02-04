@@ -74,6 +74,16 @@ function fromMinorUnits(amountMinor: number, minorUnit: number): string {
   return (amountMinor / factor).toFixed(minorUnit);
 }
 
+function formatDateForDisplay(dateOnly: string) {
+  const d = new Date(dateOnly);
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 /* ================= screen ================= */
 
 export function AddPaymentScreen() {
@@ -271,7 +281,7 @@ export function AddPaymentScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>
-          {isEdit ? "Редактирование" : "Добавить"}
+          {isEdit ? "Edit Payment" : "Add New Payment"}
         </Text>
         <TouchableOpacity
           onPress={() => navigation.navigate("Home")}
@@ -285,7 +295,7 @@ export function AddPaymentScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.label}>Тип</Text>
+        <Text style={styles.label}>Type</Text>
         <View style={styles.row}>
           {(["bill", "subscription"] as PaymentType[]).map((t) => (
             <TouchableOpacity
@@ -297,16 +307,16 @@ export function AddPaymentScreen() {
               <Text
                 style={[styles.chipText, type === t && styles.chipTextActive]}
               >
-                {t === "bill" ? "Счёт" : "Подписка"}
+                {t === "bill" ? "Bill" : "Subscription"}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={styles.label}>Название</Text>
+        <Text style={styles.label}>Name</Text>
         <TextInput value={title} onChangeText={setTitle} style={styles.input} />
 
-        <Text style={styles.label}>Сумма</Text>
+        <Text style={styles.label}>Amount</Text>
         <TextInput
           value={amount}
           onChangeText={setAmount}
@@ -314,7 +324,7 @@ export function AddPaymentScreen() {
           style={styles.input}
         />
 
-        <Text style={styles.label}>Валюта</Text>
+        <Text style={styles.label}>Currency</Text>
         <View style={styles.rowWrap}>
           {currencies.map((c) => (
             <TouchableOpacity
@@ -338,7 +348,7 @@ export function AddPaymentScreen() {
           ))}
         </View>
 
-        <Text style={styles.label}>Категория</Text>
+        <Text style={styles.label}>Category</Text>
         <View style={styles.rowWrap}>
           {categories.map((c) => (
             <TouchableOpacity
@@ -359,13 +369,16 @@ export function AddPaymentScreen() {
           ))}
         </View>
 
-        <Text style={styles.label}>Дата</Text>
+        <Text style={styles.label}>Date</Text>
         <TouchableOpacity
           style={[styles.input, styles.dateInput]}
           activeOpacity={0.85}
           onPress={() => setShowDatePicker(true)}
         >
-          <Text style={{ color: "#111", fontWeight: "700" }}>{dueDate}</Text>
+          <Text style={{ color: "#111", fontWeight: "700" }}>
+            {formatDateForDisplay(dueDate)}
+          </Text>
+
           <Ionicons name="calendar-outline" size={18} color="#666" />
         </TouchableOpacity>
 
@@ -373,7 +386,7 @@ export function AddPaymentScreen() {
           <DateTimePicker
             value={new Date(dueDate)}
             mode="date"
-            display="default"
+            display={Platform.OS === "ios" ? "spinner" : "default"}
             onChange={onPickDate}
           />
         )}
@@ -405,7 +418,7 @@ export function AddPaymentScreen() {
           </>
         )}
 
-        <Text style={styles.label}>Заметка</Text>
+        <Text style={styles.label}>Note</Text>
         <TextInput
           value={note}
           onChangeText={setNote}
@@ -419,7 +432,7 @@ export function AddPaymentScreen() {
           activeOpacity={0.9}
         >
           <Ionicons name="checkmark" size={18} color="#fff" />
-          <Text style={styles.saveText}>Сохранить</Text>
+          <Text style={styles.saveText}>Save</Text>
         </TouchableOpacity>
 
         <View style={{ height: 24 }} />

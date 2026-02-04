@@ -127,7 +127,6 @@ export function BillsScreen() {
   }, [entries, dateFilter, sortOrder]);
 
   const bills = filteredSorted.filter((e) => e.type === "bill");
-  const subs = filteredSorted.filter((e) => e.type === "subscription");
 
   /* ---------- CRUD handlers ---------- */
 
@@ -291,20 +290,7 @@ export function BillsScreen() {
                 </>
               )}
 
-              {subs.length > 0 && (
-                <>
-                  <Text style={styles.sectionTitle}>Subscriptions</Text>
-                  <FlatList
-                    data={subs}
-                    keyExtractor={(i) => i.id}
-                    renderItem={renderItem}
-                    scrollEnabled={false}
-                    ItemSeparatorComponent={() => <View style={styles.sep} />}
-                  />
-                </>
-              )}
-
-              {bills.length === 0 && subs.length === 0 && (
+              {bills.length === 0 && (
                 <View style={styles.center}>
                   <Text style={{ color: "#777" }}>
                     Нет платежей по выбранному фильтру
