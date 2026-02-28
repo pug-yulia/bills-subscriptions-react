@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-
+import { ScrollView } from "react-native";
 import {
   getAllPaymentEntries,
   deletePaymentEntry,
@@ -57,6 +57,7 @@ function nowIso(): string {
 
 type DateFilter = "all" | "thisMonth" | "next30";
 type SortOrder = "asc" | "desc";
+type CategoryFilter = "all" | string;
 
 export function BillsScreen() {
   const navigation = useNavigation<any>();
@@ -68,6 +69,7 @@ export function BillsScreen() {
 
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
 
   const categoryMap = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
@@ -111,12 +113,19 @@ export function BillsScreen() {
   const filteredSorted = useMemo(() => {
     let data = [...entries];
 
+    // date filter
     if (dateFilter === "thisMonth") {
       data = data.filter((e) => isInThisMonth(e.dueDate));
     } else if (dateFilter === "next30") {
       data = data.filter((e) => isInNext30Days(e.dueDate));
     }
 
+    // category filter
+    if (categoryFilter !== "all") {
+      data = data.filter((e) => e.categoryId === categoryFilter);
+    }
+
+    // sorting
     data.sort((a, b) => {
       const da = new Date(a.dueDate).getTime();
       const db = new Date(b.dueDate).getTime();
@@ -124,7 +133,7 @@ export function BillsScreen() {
     });
 
     return data;
-  }, [entries, dateFilter, sortOrder]);
+  }, [entries, dateFilter, categoryFilter, sortOrder]);
 
   const bills = filteredSorted.filter((e) => e.type === "bill");
 
@@ -245,60 +254,81 @@ export function BillsScreen() {
     );
   }
 
+  function categoryChip(label: string, value: CategoryFilter) {
+    const active = categoryFilter === value;
+    return (
+      <TouchableOpacity
+        onPress={() => setCategoryFilter(value)}
+        style={[styles.chip, active && styles.chipActive]}
+        activeOpacity={0.85}
+      >
+        <Text style={[styles.chipText, active && styles.chipTextActive]}>
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Payments</Text>
-
-        <TouchableOpacity
-          onPress={() => setSortOrder((o) => (o === "asc" ? "desc" : "asc"))}
-          activeOpacity={0.85}
-        >
-          <Ionicons
-            name={sortOrder === "asc" ? "arrow-down" : "arrow-up"}
-            size={20}
-          />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.filters}>
-        {filterChip("All", "all")}
-        {filterChip("This month", "thisMonth")}
-        {filterChip("Next 30 days", "next30")}
-      </View>
-
       {loading ? (
         <View style={styles.center}>
           <Text style={{ color: "#666" }}>Загрузка…</Text>
         </View>
       ) : (
         <FlatList
-          data={[]}
-          renderItem={null}
+          data={bills}
+          keyExtractor={(i) => i.id}
+          renderItem={renderItem}
+          ItemSeparatorComponent={() => <View style={styles.sep} />}
           ListHeaderComponent={
             <>
-              {bills.length > 0 && (
-                <>
-                  <Text style={styles.sectionTitle}>Bills</Text>
-                  <FlatList
-                    data={bills}
-                    keyExtractor={(i) => i.id}
-                    renderItem={renderItem}
-                    scrollEnabled={false}
-                    ItemSeparatorComponent={() => <View style={styles.sep} />}
-                  />
-                </>
-              )}
+              <View style={styles.header}>
+                <Text style={styles.headerTitle}>Payments</Text>
 
-              {bills.length === 0 && (
-                <View style={styles.center}>
-                  <Text style={{ color: "#777" }}>
-                    Нет платежей по выбранному фильтру
-                  </Text>
-                </View>
-              )}
+                <TouchableOpacity
+                  onPress={() =>
+                    setSortOrder((o) => (o === "asc" ? "desc" : "asc"))
+                  }
+                  activeOpacity={0.85}
+                >
+                  <Ionicons
+                    name={sortOrder === "asc" ? "arrow-down" : "arrow-up"}
+                    size={20}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.filters}>
+                {filterChip("All", "all")}
+                {filterChip("This month", "thisMonth")}
+                {filterChip("Next 30 days", "next30")}
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filtersScroll}
+              >
+                {categoryChip("All categories", "all")}
+                {categories.map((c) => (
+                  <View key={c.id} style={styles.chipWrap}>
+                    {categoryChip(c.name, c.id)}
+                  </View>
+                ))}
+              </ScrollView>
+
+              <Text style={styles.sectionTitle}>Bills</Text>
             </>
           }
+          ListEmptyComponent={
+            <View style={styles.center}>
+              <Text style={{ color: "#777" }}>
+                Нет платежей по выбранному фильтру
+              </Text>
+            </View>
+          }
+          contentContainerStyle={{ paddingBottom: 16 }}
         />
       )}
     </SafeAreaView>
@@ -366,4 +396,14 @@ const styles = StyleSheet.create({
   sep: { height: 1, backgroundColor: "#eee", marginHorizontal: 16 },
 
   center: { padding: 24, alignItems: "center" },
+
+  filtersScroll: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  chipWrap: {
+    marginLeft: 10, // расстояние между чипами
+  },
 });
