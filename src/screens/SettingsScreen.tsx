@@ -52,7 +52,7 @@ export function SettingsScreen() {
       setBase(current);
     } catch (e: any) {
       console.error("SettingsScreen load error:", e);
-      Alert.alert("Ошибка", String(e?.message ?? e));
+      Alert.alert("Error", String(e?.message ?? e));
     } finally {
       setLoading(false);
     }
@@ -70,7 +70,7 @@ export function SettingsScreen() {
         setBase(code);
       } catch (e: any) {
         console.error("setBaseCurrencyCode error:", e);
-        Alert.alert("Ошибка", String(e?.message ?? e));
+        Alert.alert("Error", String(e?.message ?? e));
       }
     },
     [base],
@@ -78,12 +78,12 @@ export function SettingsScreen() {
 
   const onResetDb = useCallback(() => {
     Alert.alert(
-      "Сброс базы данных",
-      "Удалить локальную базу и заполнить демо-данными заново?",
+      "Reset Database",
+      "Delete local database and repopulate with demo data?",
       [
-        { text: "Отмена", style: "cancel" },
+        { text: "Cancel", style: "cancel" },
         {
-          text: "Сбросить",
+          text: "Reset",
           style: "destructive",
           onPress: async () => {
             setLoading(true);
@@ -98,12 +98,12 @@ export function SettingsScreen() {
               await load();
 
               Alert.alert(
-                "Готово",
-                "База данных успешно сброшена и заполнена демо-данными.",
+                "Done",
+                "Database reset and repopulated successfully.",
               );
             } catch (e: any) {
               console.error("Reset DB error:", e);
-              Alert.alert("Ошибка", String(e?.message ?? e));
+              Alert.alert("Error", String(e?.message ?? e));
             } finally {
               setLoading(false);
             }
@@ -116,9 +116,9 @@ export function SettingsScreen() {
   const data: SectionItem[] = [
     {
       type: "header",
-      title: "Валюта приложения",
+      title: "App Currency",
       subtitle:
-        "Суммы и итоги будут автоматически пересчитаны в выбранную валюту",
+        "Amounts will be automatically converted to the selected currency",
     },
     ...currencies.map((c) => ({
       type: "currency" as const,
@@ -127,21 +127,20 @@ export function SettingsScreen() {
     })),
     {
       type: "header",
-      title: "Сервис",
-      subtitle: "Служебные функции для разработки и тестирования",
+      title: "Developer Tools",
+      subtitle: "Utilities for development and testing",
     },
     {
       type: "action",
       id: "resetDb",
-      title: "Сбросить базу данных",
-      subtitle:
-        "Удаляет локальные данные и пересоздаёт БД (полезно после изменения схемы)",
+      title: "Reset Database",
+      subtitle: "Deletes local data and recreates the database",
       danger: true,
     },
     {
       type: "header",
-      title: "Прочее",
-      subtitle: "Дополнительные настройки будут добавлены позже",
+      title: "Other",
+      subtitle: "Additional settings coming soon",
     },
   ];
 
@@ -154,7 +153,7 @@ export function SettingsScreen() {
       {loading ? (
         <View style={styles.loading}>
           <ActivityIndicator />
-          <Text style={styles.loadingText}>Загрузка…</Text>
+          <Text style={styles.loadingText}>Loading…</Text>
         </View>
       ) : (
         <FlatList

@@ -146,7 +146,7 @@ export function BillsScreen() {
         await loadData();
       } catch (e: any) {
         console.error("toggle paid error:", e);
-        Alert.alert("Ошибка", String(e?.message ?? e));
+        Alert.alert("Error", String(e?.message ?? e));
       }
     },
     [loadData],
@@ -155,12 +155,12 @@ export function BillsScreen() {
   const onDelete = useCallback(
     (entry: PaymentEntry) => {
       Alert.alert(
-        "Удалить запись?",
-        `"${entry.title}" будет удалена без возможности восстановления.`,
+        "Delete entry?",
+        `"${entry.title}" will be permanently deleted.`,
         [
-          { text: "Отмена", style: "cancel" },
+          { text: "Cancel", style: "cancel" },
           {
-            text: "Удалить",
+            text: "Delete",
             style: "destructive",
             onPress: async () => {
               try {
@@ -168,7 +168,7 @@ export function BillsScreen() {
                 await loadData();
               } catch (e: any) {
                 console.error("deletePaymentEntry error:", e);
-                Alert.alert("Ошибка", String(e?.message ?? e));
+                Alert.alert("Error", String(e?.message ?? e));
               }
             },
           },
@@ -273,7 +273,7 @@ export function BillsScreen() {
     <SafeAreaView style={styles.safe}>
       {loading ? (
         <View style={styles.center}>
-          <Text style={{ color: "#666" }}>Загрузка…</Text>
+          <Text style={{ color: "#666" }}>Loading…</Text>
         </View>
       ) : (
         <FlatList
@@ -324,7 +324,7 @@ export function BillsScreen() {
           ListEmptyComponent={
             <View style={styles.center}>
               <Text style={{ color: "#777" }}>
-                Нет платежей по выбранному фильтру
+                No payments match the selected filter
               </Text>
             </View>
           }

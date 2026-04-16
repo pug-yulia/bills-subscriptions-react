@@ -153,7 +153,7 @@ export function AddPaymentScreen() {
       // EDIT: грузим запись
       const entry = await getPaymentEntryById(editId);
       if (!entry) {
-        Alert.alert("Ошибка", "Запись для редактирования не найдена");
+        Alert.alert("Error", "Entry not found");
         navigation.navigate("Home");
         return;
       }
@@ -175,7 +175,7 @@ export function AddPaymentScreen() {
       setAmount(fromMinorUnits(entry.amount, mu));
     } catch (e: any) {
       console.error("AddPaymentScreen load error:", e);
-      Alert.alert("Ошибка", String(e?.message ?? e));
+      Alert.alert("Error", String(e?.message ?? e));
     } finally {
       setLoading(false);
     }
@@ -190,11 +190,11 @@ export function AddPaymentScreen() {
 
   async function onSave() {
     if (!title.trim()) {
-      Alert.alert("Ошибка", "Введите название платежа");
+      Alert.alert("Error", "Please enter a payment name");
       return;
     }
     if (!categoryId) {
-      Alert.alert("Ошибка", "Выберите категорию");
+      Alert.alert("Error", "Please select a category");
       return;
     }
 
@@ -203,7 +203,7 @@ export function AddPaymentScreen() {
     const amountMinor = toMinorUnits(amount, minorUnit);
 
     if (amountMinor === null) {
-      Alert.alert("Ошибка", "Введите корректную сумму (например 1.80)");
+      Alert.alert("Error", "Please enter a valid amount (e.g. 1.80)");
       return;
     }
 
@@ -212,7 +212,7 @@ export function AddPaymentScreen() {
     try {
       if (isEdit) {
         if (!originalEntry) {
-          Alert.alert("Ошибка", "Нет данных редактируемой записи");
+          Alert.alert("Error", "No data for this entry");
           return;
         }
 
@@ -256,7 +256,7 @@ export function AddPaymentScreen() {
       navigation.navigate("Home");
     } catch (e: any) {
       console.error("save error:", e);
-      Alert.alert("Ошибка", String(e?.message ?? e));
+      Alert.alert("Error", String(e?.message ?? e));
     }
   }
 
@@ -271,7 +271,7 @@ export function AddPaymentScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <Text style={{ color: "#666" }}>Загрузка…</Text>
+          <Text style={{ color: "#666" }}>Loading…</Text>
         </View>
       </SafeAreaView>
     );
@@ -393,7 +393,7 @@ export function AddPaymentScreen() {
 
         {type === "subscription" && (
           <>
-            <Text style={styles.label}>Повтор</Text>
+            <Text style={styles.label}>Repeat</Text>
             <View style={styles.rowWrap}>
               {(["daily", "weekly", "monthly", "yearly"] as RepeatRule[]).map(
                 (r) => (

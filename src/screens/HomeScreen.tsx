@@ -287,7 +287,7 @@ export function HomeScreen() {
           )}
           ItemSeparatorComponent={() => <View style={styles.sep} />}
           ListEmptyComponent={
-            <Text style={styles.empty}>Нет ближайших счетов</Text>
+            <Text style={styles.empty}>No upcoming bills</Text>
           }
         />
 
@@ -321,7 +321,7 @@ export function HomeScreen() {
             />
           )}
           ItemSeparatorComponent={() => <View style={styles.sep} />}
-          ListEmptyComponent={<Text style={styles.empty}>Нет подписок</Text>}
+          ListEmptyComponent={<Text style={styles.empty}>No subscriptions</Text>}
         />
       </View>
     </SafeAreaView>
