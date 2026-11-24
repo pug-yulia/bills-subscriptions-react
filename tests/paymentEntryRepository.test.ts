@@ -7,7 +7,7 @@ const mockDb = {
 };
 
 type Repo = typeof import("../src/repo/paymentEntryRepository");
-/*
+
 describe("paymentEntryRepository", () => {
   let repo: Repo;
 
@@ -15,7 +15,7 @@ describe("paymentEntryRepository", () => {
     id: "p1",
     title: "Netflix",
     amount: 180, // центы/копейки
-    currency: "USD",
+    currencyCode: "USD",
     type: "subscription",
     categoryId: "subscriptions",
     dueDate: "2026-01-15T00:00:00.000Z",
@@ -109,31 +109,6 @@ describe("paymentEntryRepository", () => {
     expect(res[1].isPaid).toBe(true);
   });
 
-  test("getPaymentEntriesByCategory: передаёт categoryId и маппит isPaid", async () => {
-    mockDb.getAllAsync.mockResolvedValueOnce([{ ...baseEntry, isPaid: 1 }]);
-
-    const res = await repo.getPaymentEntriesByCategory("subscriptions");
-
-    expect(mockDb.getAllAsync).toHaveBeenCalledWith(expect.any(String), [
-      "subscriptions",
-    ]);
-    expect(res[0].isPaid).toBe(true);
-  });
-
-  test("getPaymentEntriesByDueDateRange: передаёт диапазон дат", async () => {
-    mockDb.getAllAsync.mockResolvedValueOnce([]);
-
-    await repo.getPaymentEntriesByDueDateRange(
-      "2026-01-01T00:00:00.000Z",
-      "2026-01-31T23:59:59.999Z",
-    );
-
-    expect(mockDb.getAllAsync).toHaveBeenCalledWith(expect.any(String), [
-      "2026-01-01T00:00:00.000Z",
-      "2026-01-31T23:59:59.999Z",
-    ]);
-  });
-
   test("insertPaymentEntry: конвертирует isPaid=false в 0, repeatRule/note -> значения", async () => {
     mockDb.runAsync.mockResolvedValueOnce({} as any);
 
@@ -145,7 +120,7 @@ describe("paymentEntryRepository", () => {
         baseEntry.id,
         baseEntry.title,
         baseEntry.amount,
-        baseEntry.currency,
+        baseEntry.currencyCode,
         baseEntry.type,
         baseEntry.categoryId,
         baseEntry.dueDate,
@@ -177,7 +152,7 @@ describe("paymentEntryRepository", () => {
         entry.id,
         entry.title,
         entry.amount,
-        entry.currency,
+        entry.currencyCode,
         entry.type,
         entry.categoryId,
         entry.dueDate,
@@ -207,7 +182,7 @@ describe("paymentEntryRepository", () => {
       [
         entry.title,
         entry.amount,
-        entry.currency,
+        entry.currencyCode,
         entry.type,
         entry.categoryId,
         entry.dueDate,
@@ -246,47 +221,4 @@ describe("paymentEntryRepository", () => {
       ["p1"],
     );
   });
-
-  test("getExpenseTotalsByCategory: группировка и возврат totalAmount", async () => {
-    mockDb.getAllAsync.mockResolvedValueOnce([
-      { categoryId: "food", totalAmount: 1234 },
-      { categoryId: "transport", totalAmount: 500 },
-    ]);
-
-    const res = await repo.getExpenseTotalsByCategory(
-      "2026-01-01T00:00:00.000Z",
-      "2026-01-31T23:59:59.999Z",
-    );
-
-    expect(mockDb.getAllAsync).toHaveBeenCalledWith(expect.any(String), [
-      "2026-01-01T00:00:00.000Z",
-      "2026-01-31T23:59:59.999Z",
-    ]);
-    expect(res).toEqual([
-      { categoryId: "food", totalAmount: 1234 },
-      { categoryId: "transport", totalAmount: 500 },
-    ]);
-  });
-
-  test("getExpenseTotal: возвращает 0 если SUM=null", async () => {
-    mockDb.getFirstAsync.mockResolvedValueOnce({ total: null });
-
-    const total = await repo.getExpenseTotal(
-      "2026-01-01T00:00:00.000Z",
-      "2026-01-31T23:59:59.999Z",
-    );
-
-    expect(total).toBe(0);
-  });
-
-  test("getExpenseTotal: возвращает сумму если есть данные", async () => {
-    mockDb.getFirstAsync.mockResolvedValueOnce({ total: 999 });
-
-    const total = await repo.getExpenseTotal(
-      "2026-01-01T00:00:00.000Z",
-      "2026-01-31T23:59:59.999Z",
-    );
-
-    expect(total).toBe(999);
-  });
-});*/
+});

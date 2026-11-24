@@ -40,7 +40,7 @@ import { PaymentEntry } from "../domain/PaymentEntry";
 import { useFocusEffect } from "@react-navigation/native";
 
 function monthKey(d: Date) {
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
 export function HomeScreen() {
@@ -192,6 +192,14 @@ export function HomeScreen() {
       .slice(0, 4);
   }, [entries]);
 
+  const upcomingBillsTotalBase = useMemo(() => {
+    let sum = 0;
+    for (const e of upcomingBills) {
+      sum += convertMinor(e.amount, e.currencyCode, baseCurrencyCode);
+    }
+    return sum;
+  }, [upcomingBills, baseCurrencyCode, rateMap]);
+
   const activeSubscriptions = useMemo(() => {
     return entries
       .filter((e) => e.type === "subscription")
@@ -250,7 +258,7 @@ export function HomeScreen() {
             <Text style={styles.cardBottomValue}>
               {loading
                 ? "—"
-                : formatMoneyMinor(totalThisMonthBase, baseCurrencyCode)}
+                : formatMoneyMinor(upcomingBillsTotalBase, baseCurrencyCode)}
             </Text>
           </View>
         </View>

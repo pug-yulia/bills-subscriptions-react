@@ -17,7 +17,13 @@ import {
   setPaymentEntryPaidStatus,
 } from "../repo/paymentEntryRepository";
 import { getAllCategories } from "../repo/categoryRepository";
-import { getAllCurrencies, Currency } from "../repo/currencyRepository";
+import {
+  getAllCurrencies,
+  getAllFxRates,
+  getBaseCurrencyCode,
+  Currency,
+  FxRate,
+} from "../repo/currencyRepository";
 
 import { PaymentEntry } from "../domain/PaymentEntry";
 import { Category } from "../domain/Category";
@@ -65,6 +71,8 @@ export function BillsScreen() {
   const [entries, setEntries] = useState<PaymentEntry[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [fxRates, setFxRates] = useState<FxRate[]>([]);
+  const [baseCurrencyCode, setBaseCurrencyCode] = useState<string>("USD");
   const [loading, setLoading] = useState(true);
 
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
@@ -80,17 +88,45 @@ export function BillsScreen() {
     [currencies],
   );
 
+  const rateMap = useMemo(() => {
+    const m = new Map<string, number>();
+    fxRates.forEach((r) => m.set(`${r.baseCode}->${r.quoteCode}`, r.rate));
+    return m;
+  }, [fxRates]);
+
+  function getRate(from: string, to: string): number | null {
+    if (from === to) return 1;
+
+    const direct = rateMap.get(`${from}->${to}`);
+    if (direct != null) return direct;
+
+    const inverse = rateMap.get(`${to}->${from}`);
+    if (inverse != null && inverse !== 0) return 1 / inverse;
+
+    return null;
+  }
+
+  function convertMinor(amountMinor: number, from: string, to: string): number {
+    const r = getRate(from, to);
+    if (r == null) return amountMinor;
+    return Math.round(amountMinor * r);
+  }
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [ents, cats, currs] = await Promise.all([
+      const [ents, cats, currs, rates, base] = await Promise.all([
         getAllPaymentEntries(),
         getAllCategories(),
         getAllCurrencies(),
+        getAllFxRates(),
+        getBaseCurrencyCode(),
       ]);
       setEntries(ents);
       setCategories(cats);
       setCurrencies(currs);
+      setFxRates(rates);
+      setBaseCurrencyCode(base);
     } catch (e) {
       console.error("BillsScreen loadData error:", e);
     } finally {
@@ -182,7 +218,7 @@ export function BillsScreen() {
 
   function renderItem({ item }: { item: PaymentEntry }) {
     const cat = categoryMap.get(item.categoryId);
-    const cur = currencyMap.get(item.currencyCode);
+    const cur = currencyMap.get(baseCurrencyCode);
 
     return (
       <View style={styles.row}>
@@ -197,7 +233,12 @@ export function BillsScreen() {
 
         <View style={styles.right}>
           <Text style={[styles.amount, item.isPaid && styles.paidAmount]}>
-            {cur ? formatAmount(item.amount, cur) : "—"}
+            {cur
+              ? formatAmount(
+                  convertMinor(item.amount, item.currencyCode, baseCurrencyCode),
+                  cur,
+                )
+              : "—"}
           </Text>
 
           <View style={styles.actions}>

@@ -1,8 +1,11 @@
 import { Category } from "../domain/Category";
-import { PaymentEntry } from "../domain/PaymentEntry";
+import { PaymentEntry, PaymentType, RepeatRule } from "../domain/PaymentEntry";
 import { insertCategory } from "../repo/categoryRepository";
 import { insertPaymentEntry } from "../repo/paymentEntryRepository";
 import { db } from "./database";
+
+// Seed data mirrors the Swift app (bills-subscriptions-swift), which is the
+// reference for benchmarking. Keep both in sync.
 
 function now(): string {
   return new Date().toISOString();
@@ -42,90 +45,37 @@ export async function seedCurrenciesAndRates(): Promise<void> {
     ["baseCurrencyCode", "USD"],
   );
 
-  // Курс: 1 USD = 90 RUB (пример фиксированного курса для воспроизводимости)
-  await db.runAsync(
-    `INSERT OR REPLACE INTO fx_rates (baseCode, quoteCode, rate, updatedAt) VALUES (?, ?, ?, ?)`,
-    ["USD", "RUB", 90.0, now()],
-  );
+  // Fixed rates for reproducibility. Only one direction per pair is stored;
+  // the opposite direction is derived as 1 / rate (see getRate in HomeScreen).
+  const rates: [string, string, number][] = [
+    ["USD", "RUB", 90.0],
+    ["EUR", "RUB", 98.0],
+    ["EUR", "USD", 1.08],
+  ];
 
-  // Обратный курс: 1 RUB = 1/90 USD
-  await db.runAsync(
-    `INSERT OR REPLACE INTO fx_rates (baseCode, quoteCode, rate, updatedAt) VALUES (?, ?, ?, ?)`,
-    ["RUB", "USD", 1 / 90.0, now()],
-  );
-
-  // 1 EUR = 1.08 USD
-  await db.runAsync(
-    `INSERT OR REPLACE INTO fx_rates (baseCode, quoteCode, rate, updatedAt) VALUES (?, ?, ?, ?)`,
-    ["EUR", "USD", 1.08, now()],
-  );
-
-  // 1 USD = 0.93 EUR
-  await db.runAsync(
-    `INSERT OR REPLACE INTO fx_rates (baseCode, quoteCode, rate, updatedAt) VALUES (?, ?, ?, ?)`,
-    ["USD", "EUR", 0.93, now()],
-  );
+  for (const [baseCode, quoteCode, rate] of rates) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO fx_rates (baseCode, quoteCode, rate, updatedAt) VALUES (?, ?, ?, ?)`,
+      [baseCode, quoteCode, rate, now()],
+    );
+  }
 }
 
 /* ---------- Categories ---------- */
 
+function category(id: string, name: string, color: string): Category {
+  return { id, name, color, createdAt: now(), updatedAt: now() };
+}
+
 export const DEFAULT_CATEGORIES: Category[] = [
-  {
-    id: "food",
-    name: "Food",
-    color: "#FF7043",
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "transport",
-    name: "Transport",
-    color: "#42A5F5",
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "subscriptions",
-    name: "Subscriptions",
-    color: "#AB47BC",
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "utilities",
-    name: "Utilities",
-    color: "#26A69A",
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "shopping",
-    name: "Shopping",
-    color: "#00F5D4",
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "health",
-    name: "Health",
-    color: "#F15BB5",
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "education",
-    name: "Education",
-    color: "#00BBF9",
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "home",
-    name: "Home",
-    color: "#FF6B6B",
-    createdAt: now(),
-    updatedAt: now(),
-  },
+  category("utilities", "Utilities", "#4D96FF"),
+  category("home", "Home", "#FF6B6B"),
+  category("entertainment", "Entertainment", "#6BCB77"),
+  category("food", "Food", "#FFA41B"),
+  category("transport", "Transport", "#9B5DE5"),
+  category("health", "Health", "#F15BB5"),
+  category("education", "Education", "#00BBF9"),
+  category("shopping", "Shopping", "#00F5D4"),
 ];
 
 export async function seedCategories(): Promise<void> {
@@ -136,175 +86,54 @@ export async function seedCategories(): Promise<void> {
 
 /* ---------- Payment entries ---------- */
 
+function entry(
+  id: string,
+  title: string,
+  amount: number, // minor units (cents/kopecks)
+  currencyCode: string,
+  type: PaymentType,
+  categoryId: string,
+  dueInDays: number,
+  repeatRule: RepeatRule | null,
+): PaymentEntry {
+  return {
+    id,
+    title,
+    amount,
+    currencyCode,
+    type,
+    categoryId,
+    dueDate: daysFromNow(dueInDays),
+    repeatRule,
+    note: null,
+    isPaid: false,
+    createdAt: now(),
+    updatedAt: now(),
+  };
+}
+
 export const DEFAULT_PAYMENT_ENTRIES: PaymentEntry[] = [
-  {
-    id: "p_food_1",
-    title: "Supermarket groceries",
-    amount: 4500,
-    currencyCode: "RUB",
-    type: "bill",
-    categoryId: "food",
-    dueDate: daysFromNow(-3),
-    repeatRule: null,
-    note: "Weekly shop",
-    isPaid: true,
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "p_transport_1",
-    title: "Transit pass",
-    amount: 3000,
-    currencyCode: "RUB",
-    type: "bill",
-    categoryId: "transport",
-    dueDate: daysFromNow(-1),
-    repeatRule: null,
-    note: null,
-    isPaid: true,
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "p_subs_netflix",
-    title: "Netflix",
-    amount: 899,
-    currencyCode: "USD",
-    type: "subscription",
-    categoryId: "subscriptions",
-    dueDate: daysFromNow(5),
-    repeatRule: "monthly",
-    note: "Video streaming",
-    isPaid: false,
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "p_subs_weekly",
-    title: "Gym Weekly",
-    amount: 499, // 4.99
-    currencyCode: "USD",
-    type: "subscription",
-    categoryId: "health",
-    dueDate: daysFromNow(2),
-    repeatRule: "weekly",
-    note: "Weekly membership",
-    isPaid: false,
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "p_utilities",
-    title: "Electricity",
-    amount: 5200,
-    currencyCode: "RUB",
-    type: "bill",
-    categoryId: "utilities",
-    dueDate: daysFromNow(10),
-    repeatRule: null,
-    note: "Monthly bill",
-    isPaid: false,
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "p_food_2",
-    title: "Cafe lunch",
-    amount: 1200,
-    currencyCode: "RUB",
-    type: "bill",
-    categoryId: "food",
-    dueDate: daysFromNow(-7),
-    repeatRule: null,
-    note: "Business lunch",
-    isPaid: true,
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "p_transport_2",
-    title: "Taxi",
-    amount: 850,
-    currencyCode: "RUB",
-    type: "bill",
-    categoryId: "transport",
-    dueDate: daysFromNow(-2),
-    repeatRule: null,
-    note: "Airport trip",
-    isPaid: true,
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "p_subs_spotify",
-    title: "Spotify",
-    amount: 1099, // $10.99
-    currencyCode: "USD",
-    type: "subscription",
-    categoryId: "subscriptions",
-    dueDate: daysFromNow(3),
-    repeatRule: "monthly",
-    note: "Music streaming",
-    isPaid: false,
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "p_utilities_water",
-    title: "Water supply",
-    amount: 1800,
-    currencyCode: "RUB",
-    type: "bill",
-    categoryId: "utilities",
-    dueDate: daysFromNow(14),
-    repeatRule: null,
-    note: "Water bill",
-    isPaid: false,
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "p_subs_cloud",
-    title: "Cloud Storage",
-    amount: 299, // $2.99
-    currencyCode: "USD",
-    type: "subscription",
-    categoryId: "subscriptions",
-    dueDate: daysFromNow(1),
-    repeatRule: "monthly",
-    note: "Backup storage",
-    isPaid: false,
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "p_home_1",
-    title: "Home supplies",
-    amount: 7800,
-    currencyCode: "RUB",
-    type: "bill",
-    categoryId: "home",
-    dueDate: daysFromNow(4),
-    repeatRule: null,
-    note: null,
-    isPaid: false,
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "p_internet",
-    title: "Internet",
-    amount: 3999,
-    currencyCode: "USD",
-    type: "bill",
-    categoryId: "utilities",
-    dueDate: daysFromNow(7),
-    repeatRule: null,
-    note: null,
-    isPaid: false,
-    createdAt: now(),
-    updatedAt: now(),
-  },
+  // Bills
+  entry("p_internet", "Internet", 3999, "USD", "bill", "utilities", 0, null),
+  entry("p_electricity", "Electricity", 1245, "USD", "bill", "home", 3, null),
+  entry("p_water", "Water", 870, "USD", "bill", "home", 10, null),
+  entry("p_mobile_plan", "Mobile plan", 1299, "USD", "bill", "utilities", 7, null),
+  entry("p_gas", "Gas", 2150, "USD", "bill", "home", 14, null),
+  entry("p_groceries", "Groceries", 5200, "EUR", "bill", "food", 1, null),
+  entry("p_fuel", "Fuel", 4500, "EUR", "bill", "transport", 5, null),
+  entry("p_pharmacy", "Pharmacy", 1590, "EUR", "bill", "health", 2, null),
+  entry("p_home_supplies", "Home supplies", 78000, "RUB", "bill", "shopping", 4, null),
+
+  // Subscriptions
+  entry("p_netflix", "Netflix", 1599, "USD", "subscription", "entertainment", 20, "monthly"),
+  entry("p_spotify", "Spotify", 1099, "USD", "subscription", "entertainment", 12, "monthly"),
+  entry("p_icloud", "iCloud+", 299, "USD", "subscription", "utilities", 9, "monthly"),
+  entry("p_gym", "Gym", 2500, "EUR", "subscription", "health", 6, "monthly"),
+  entry("p_language_course", "Language Course", 8900, "EUR", "subscription", "education", 15, "monthly"),
+  entry("p_commute_pass", "Weekly commute pass", 1200, "EUR", "subscription", "transport", 7, "weekly"),
+  entry("p_daily_coffee", "Daily coffee", 350, "EUR", "subscription", "food", 1, "daily"),
+  entry("p_prime", "Prime", 899, "USD", "subscription", "shopping", 18, "yearly"),
+  entry("p_music_rub", "Music (RUB)", 19900, "RUB", "subscription", "entertainment", 11, "monthly"),
 ];
 
 export async function seedPaymentEntries(): Promise<void> {
